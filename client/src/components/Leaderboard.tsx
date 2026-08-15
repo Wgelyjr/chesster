@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { fetchLeaderboard } from '../lib/api'
 import { resultShort } from '../lib/game'
 import type { LeaderboardRow } from '../types'
@@ -6,6 +6,9 @@ import type { LeaderboardRow } from '../types'
 type Tab = number | 'all'
 
 const TABS: Tab[] = ['all', 1, 2, 3, 4, 5, 6, 7, 8]
+const POLL_MS = 30_000
+
+export const LEADERBOARD_REFRESH_EVENT = 'chesster:leaderboard-refresh'
 
 export default function Leaderboard() {
   const [tab, setTab] = useState<Tab>('all')
@@ -13,25 +16,39 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const load = useCallback(
+    (difficulty: number | null, silent: boolean) => {
+      if (!silent) {
+        setLoading(true)
+        setError(null)
+      }
+      fetchLeaderboard(difficulty)
+        .then((r) => {
+          setRows(r)
+          if (!silent) setLoading(false)
+        })
+        .catch((e: unknown) => {
+          if (silent) return
+          setError(e instanceof Error ? e.message : 'failed to load leaderboard')
+          setLoading(false)
+        })
+    },
+    [],
+  )
+
   useEffect(() => {
-    let alive = true
-    setLoading(true)
-    setError(null)
-    fetchLeaderboard(tab === 'all' ? null : tab)
-      .then((r) => {
-        if (!alive) return
-        setRows(r)
-        setLoading(false)
-      })
-      .catch((e: unknown) => {
-        if (!alive) return
-        setError(e instanceof Error ? e.message : 'failed to load leaderboard')
-        setLoading(false)
-      })
+    load(tab === 'all' ? null : tab, false)
+  }, [tab, load])
+
+  useEffect(() => {
+    const onRefresh = () => load(tab === 'all' ? null : tab, true)
+    window.addEventListener(LEADERBOARD_REFRESH_EVENT, onRefresh)
+    const id = window.setInterval(onRefresh, POLL_MS)
     return () => {
-      alive = false
+      window.removeEventListener(LEADERBOARD_REFRESH_EVENT, onRefresh)
+      window.clearInterval(id)
     }
-  }, [tab])
+  }, [tab, load])
 
   return (
     <section className="panel">

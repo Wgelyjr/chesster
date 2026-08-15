@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { NAME_STORAGE_KEY, readBest, submitRun, writeBest } from '../lib/api'
 import { isDrawResult, resultSubtitle, resultTitle } from '../lib/game'
+import { LEADERBOARD_REFRESH_EVENT } from './Leaderboard'
 import type { Color, Result } from '../types'
 
 interface GameOverModalProps {
@@ -53,6 +54,7 @@ export default function GameOverModal({
       localStorage.setItem(NAME_STORAGE_KEY, trimmed)
       writeBest(difficulty, score)
       setSubmit({ status: 'success', rank })
+      window.dispatchEvent(new CustomEvent(LEADERBOARD_REFRESH_EVENT))
     } catch (e: unknown) {
       setSubmit({
         status: 'error',
