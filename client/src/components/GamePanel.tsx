@@ -33,8 +33,7 @@ export default function GamePanel({
       <section className="panel">
         <h2>Start a run</h2>
         <p className="panel-hint">
-          Play Stockfish. The game ends the moment it ends — your score is how many
-          moves you made.
+          Choose the difficulty and turn order; white moves first. Difficulty determines how far ahead Stockfish will think.
         </p>
         <div className="field">
           <div className="field-label">Difficulty</div>
