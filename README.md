@@ -94,7 +94,7 @@ chesster ships as a single Node process: the Express API also serves the built c
 
 5. **Behind a reverse proxy**
 
-   - Score rate limiting (10 submissions/minute) keys on the request IP. If you put a proxy in front of the app, configure Express to trust it (`app.set('trust proxy', 1)`) so limits apply per user instead of per proxy.
+   - The app already trusts a single reverse-proxy hop (`app.set('trust proxy', 1)`), so the score rate limit (10 submissions/minute) applies per user via `X-Forwarded-For`. If you stack multiple proxy layers, bump the trust depth accordingly.
    - No WebSockets are used, so a plain HTTP proxy is fine. Static assets from `client/dist` can also be served by your CDN/proxy if you prefer.
 
 6. **Backups** — copy the data directory (including the `chesster.db-wal`/`-shm` files, or run `sqlite3 chesster.db 'VACUUM'` first) to back up runs and leaderboard data.

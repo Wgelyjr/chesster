@@ -11,6 +11,7 @@ const PORT = Number(process.env.PORT ?? 3001)
 
 const app = express()
 app.disable('x-powered-by')
+app.set('trust proxy', 1)
 app.use(express.json({ limit: '100kb' }))
 
 type Bucket = { count: number; resetAt: number }
