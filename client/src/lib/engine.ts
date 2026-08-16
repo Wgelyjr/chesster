@@ -61,7 +61,7 @@ class StockfishEngine {
     return new Promise<string | null>((resolve, reject) => {
       this.pendingBestMove = { resolve, reject }
       this.send(`position fen ${fen}`)
-      this.send(`go depth ${level.depth} movetime ${level.movetime}`)
+      this.send(`go depth ${level.depth}`)
     })
   }
 

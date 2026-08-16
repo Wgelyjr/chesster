@@ -5,7 +5,7 @@ import type { LeaderboardRow } from '../types'
 
 type Tab = number | 'all'
 
-const TABS: Tab[] = ['all', 1, 2, 3, 4, 5, 6, 7, 8]
+const TABS: Tab[] = ['all', 1, 2, 3]
 const POLL_MS = 30_000
 
 export const LEADERBOARD_REFRESH_EVENT = 'chesster:leaderboard-refresh'

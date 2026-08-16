@@ -48,7 +48,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    difficulty INTEGER NOT NULL CHECK (difficulty BETWEEN 1 AND 8),
+    difficulty INTEGER NOT NULL CHECK (difficulty BETWEEN 1 AND 3),
     score INTEGER NOT NULL CHECK (score >= 1),
     result TEXT NOT NULL,
     color TEXT NOT NULL CHECK (color IN ('w', 'b')),

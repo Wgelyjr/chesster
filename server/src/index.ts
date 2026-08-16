@@ -47,8 +47,8 @@ app.get('/api/leaderboard', (req, res) => {
   let difficulty: number | null = null
   if (difficultyRaw !== undefined) {
     const parsed = Number(difficultyRaw)
-    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 8) {
-      res.status(400).json({ error: 'difficulty must be an integer between 1 and 8' })
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 3) {
+      res.status(400).json({ error: 'difficulty must be an integer between 1 and 3' })
       return
     }
     difficulty = parsed
@@ -84,8 +84,8 @@ app.post('/api/runs', (req, res) => {
   }
 
   const difficulty = body.difficulty
-  if (typeof difficulty !== 'number' || !Number.isInteger(difficulty) || difficulty < 1 || difficulty > 8) {
-    res.status(400).json({ error: 'difficulty must be an integer between 1 and 8' })
+  if (typeof difficulty !== 'number' || !Number.isInteger(difficulty) || difficulty < 1 || difficulty > 3) {
+    res.status(400).json({ error: 'difficulty must be an integer between 1 and 3' })
     return
   }
 
