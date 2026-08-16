@@ -6,7 +6,13 @@ import GameOverModal from './components/GameOverModal'
 import GamePanel from './components/GamePanel'
 import Leaderboard from './components/Leaderboard'
 import { engine } from './lib/engine'
-import { categorizeEnd } from './lib/game'
+import {
+  categorizeEnd,
+  explainBlockedMove,
+  explainNoMoves,
+  findKingSquare,
+  MOVE_BLOCK_TEXT,
+} from './lib/game'
 import { levelById } from './lib/levels'
 import type { Color, GamePhase, Result } from './types'
 
@@ -20,11 +26,6 @@ interface GameOverInfo {
   score: number
 }
 
-function findKingSquare(chess: Chess, color: 'w' | 'b'): string | null {
-  const found = chess.findPiece({ type: 'k', color })
-  return found.length > 0 ? found[0] : null
-}
-
 export default function App() {
   const chessRef = useRef(new Chess())
   const movesRef = useRef<string[]>([])
@@ -35,6 +36,8 @@ export default function App() {
   const difficultyRef = useRef<number>(1)
   const genRef = useRef(0)
   const promotionRef = useRef<PromotionPending | null>(null)
+  const reasonIdRef = useRef(0)
+  const moveReasonRef = useRef<{ text: string; id: number } | null>(null)
 
   const [phase, setPhaseState] = useState<GamePhase>('setup')
   const [userColor, setUserColor] = useState<Color>('w')
@@ -48,6 +51,8 @@ export default function App() {
   const [promotion, setPromotionState] = useState<PromotionPending | null>(null)
   const [gameOver, setGameOver] = useState<GameOverInfo | null>(null)
   const [engineError, setEngineError] = useState<string | null>(null)
+  const [dragSource, setDragSource] = useState<string | null>(null)
+  const [moveReason, setMoveReasonState] = useState<{ text: string; id: number } | null>(null)
 
   const setPhase = useCallback((p: GamePhase) => {
     phaseRef.current = p
@@ -58,6 +63,25 @@ export default function App() {
     promotionRef.current = p
     setPromotionState(p)
   }, [])
+
+  const setMoveReason = useCallback((r: { text: string; id: number } | null) => {
+    moveReasonRef.current = r
+    setMoveReasonState(r)
+  }, [])
+
+  const showBlockedReason = useCallback(
+    (from: string, to: string) => {
+      const reason = explainBlockedMove(
+        chessRef.current,
+        from as Square,
+        to as Square,
+        userColorRef.current,
+      )
+      const id = ++reasonIdRef.current
+      setMoveReason({ text: MOVE_BLOCK_TEXT[reason], id })
+    },
+    [setMoveReason],
+  )
 
   const syncBoard = useCallback(() => {
     const chess = chessRef.current
@@ -139,13 +163,24 @@ export default function App() {
   const handlePieceDrop = useCallback(
     (args: { sourceSquare: string; targetSquare: string | null }): boolean => {
       const { sourceSquare, targetSquare } = args
-      if (!targetSquare) return false
-      if (phaseRef.current !== 'playing') return false
-      if (promotionRef.current !== null) return false
+      setDragSource(null)
+      if (!targetSquare || targetSquare === sourceSquare) {
+        return false
+      }
+      if (phaseRef.current !== 'playing') {
+        return false
+      }
+      if (promotionRef.current !== null) {
+        return false
+      }
       const chess = chessRef.current
-      if (chess.turn() !== userColorRef.current || thinkingRef.current) return false
+      if (chess.turn() !== userColorRef.current || thinkingRef.current) {
+        return false
+      }
       const piece = chess.get(sourceSquare as Square)
-      if (!piece || piece.color !== userColorRef.current) return false
+      if (!piece || piece.color !== userColorRef.current) {
+        return false
+      }
       const isPromotion =
         piece.type === 'p' &&
         ((userColorRef.current === 'w' && targetSquare[1] === '8') ||
@@ -154,7 +189,10 @@ export default function App() {
         const legal = chess
           .moves({ square: sourceSquare as Square, verbose: true })
           .some((mm) => mm.from === sourceSquare && mm.to === targetSquare)
-        if (!legal) return false
+        if (!legal) {
+          showBlockedReason(sourceSquare, targetSquare)
+          return false
+        }
         setPromotion({ from: sourceSquare, to: targetSquare })
         return false
       }
@@ -162,13 +200,32 @@ export default function App() {
       try {
         m = chess.move({ from: sourceSquare, to: targetSquare })
       } catch {
+        showBlockedReason(sourceSquare, targetSquare)
         return false
       }
       applyUserMove(m)
       return true
     },
-    [applyUserMove, setPromotion],
+    [applyUserMove, setPromotion, showBlockedReason],
   )
+
+  const handlePieceDrag = useCallback(
+    (args: { square: string | null }) => {
+      const { square } = args
+      if (square === null) return
+      setDragSource((prev) => {
+        if (prev !== null) return prev
+        const piece = chessRef.current.get(square as Square)
+        if (!piece || piece.color !== userColorRef.current) return null
+        return square
+      })
+    },
+    [],
+  )
+
+  const handlePieceDragCancel = useCallback(() => {
+    setDragSource(null)
+  }, [])
 
   const choosePromotion = useCallback(
     (promo: 'q' | 'r' | 'b' | 'n') => {
@@ -210,11 +267,13 @@ export default function App() {
       setEngineError(null)
       setLastMove(null)
       setPromotion(null)
+      setDragSource(null)
+      setMoveReason(null)
       setPhase('playing')
       syncBoard()
       if (color === 'b') void engineMove()
     },
-    [setPhase, setPromotion, syncBoard, engineMove],
+    [setPhase, setPromotion, setMoveReason, syncBoard, engineMove],
   )
 
   const playAgain = useCallback(() => {
@@ -233,9 +292,11 @@ export default function App() {
     setEngineError(null)
     setLastMove(null)
     setPromotion(null)
+    setDragSource(null)
+    setMoveReason(null)
     setPhase('setup')
     syncBoard()
-  }, [setPhase, setPromotion, syncBoard])
+  }, [setPhase, setPromotion, setMoveReason, syncBoard])
 
   const resign = useCallback(() => {
     if (phaseRef.current !== 'playing') return
@@ -247,12 +308,41 @@ export default function App() {
     return findKingSquare(chessRef.current, turn)
   }, [inCheck, turn, fen])
 
+  const legalTargets = useMemo(() => {
+    if (dragSource === null || promotion !== null) return []
+    const chess = chessRef.current
+    if (chess.turn() !== userColorRef.current) return []
+    return chess
+      .moves({ square: dragSource as Square, verbose: true })
+      .map((m) => ({ square: m.to as string, capture: m.captured !== undefined }))
+  }, [dragSource, promotion, fen])
+
   useEffect(() => {
     return () => {
       genRef.current++
       thinkingRef.current = false
     }
   }, [])
+
+  useEffect(() => {
+    if (dragSource === null || legalTargets.length > 0) return
+    const text = explainNoMoves(
+      chessRef.current,
+      dragSource as Square,
+      userColorRef.current,
+    )
+    if (moveReasonRef.current?.text === text) return
+    const id = ++reasonIdRef.current
+    setMoveReason({ text, id })
+  }, [dragSource, legalTargets, setMoveReason])
+
+  useEffect(() => {
+    if (moveReason === null || dragSource !== null) return
+    const timer = window.setTimeout(() => {
+      setMoveReason(null)
+    }, 2500)
+    return () => window.clearTimeout(timer)
+  }, [moveReason, dragSource, setMoveReason])
 
   const userTurn = phase === 'playing' && turn === userColor && !thinking
   const allowDragging = userTurn && engineError === null
@@ -261,7 +351,18 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <h1 className="app-title">Chesster</h1>
-        <p className="app-tagline">How long can you last against Stockfish?</p>
+        <p className="app-tagline">
+          How long can you last against{' '}
+          <a
+            className="app-tagline-link"
+            href="https://stockfishchess.org/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Stockfish
+          </a>
+          ?
+        </p>
       </header>
       <main className="main-grid">
         <section className="board-col">
@@ -272,7 +373,12 @@ export default function App() {
               allowDragging={allowDragging}
               lastMove={lastMove}
               checkSquare={checkSquare}
+              dragSource={dragSource}
+              legalTargets={legalTargets}
+              moveReason={moveReason}
               onPieceDrop={handlePieceDrop}
+              onPieceDrag={handlePieceDrag}
+              onPieceDragCancel={handlePieceDragCancel}
             />
             {promotion !== null && (
               <PromotionPicker
@@ -322,7 +428,18 @@ export default function App() {
         >
           github.com/Wgelyjr/chesster
         </a>
-        <span className="muted">100% of this code was generated by Qwen 3.8 27b.</span>
+        <span className="muted">
+          Powered by{' '}
+          <a
+            className="app-footer-link"
+            href="https://github.com/nmrugg/stockfish.js/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            stockfish.js
+          </a>
+        </span>
+        <span className="muted">100% of the non-stockfish code was generated by Qwen 3.8 27b.</span>
       </footer>
       {gameOver !== null && phase === 'over' && (
         <GameOverModal
